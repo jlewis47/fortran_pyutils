@@ -1,22 +1,28 @@
 import numpy as np
 import sys
 
-def read_record(stream, tgt_size, dtype):
+def read_record(stream, tgt_size, dtype, debug=False):
     nread = 0
-    bytesize = np.dtype(dtype).itemsize
-    total_bytesize = tgt_size * bytesize
+
+    if not isinstance(dtype, list):
+        bytesize = np.dtype(dtype).itemsize
+        total_bytesize = tgt_size * bytesize
+    else:
+        bytesize = [np.dtype(dt).itemsize for dt in dtype]
+        total_bytesize = np.sum(bytesize)
+    
 
     outs = np.zeros(total_bytesize, dtype="S1")
 
-    print(total_bytesize, bytesize, tgt_size)
+    if debug:print(total_bytesize, bytesize, tgt_size)
 
     while nread < total_bytesize:
         nrec = abs(np.fromfile(stream, dtype=np.int32, count=1)[0])
-        print(nrec)
+        if debug:print(nrec)
         outs[nread : nread + nrec] = np.frombuffer(stream.read(nrec), dtype="S1")
         nread += nrec
         nrec = abs(np.fromfile(stream, dtype=np.int32, count=1)[0])
-        print(nrec)
+        # print(nrec)
 
     return np.frombuffer(outs, dtype=dtype)
 
