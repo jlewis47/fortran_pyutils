@@ -27,7 +27,7 @@ def read_record(stream, tgt_size: int, dtype, debug=False, args=None):
         outs = np.empty(total_bytesize, dtype="S1")
 
         if debug:
-            print(total_bytesize, bytesize, tgt_size)
+            # print(total_bytesize, bytesize, tgt_size)
             while nread < total_bytesize:
                 nrec = abs(np.fromfile(stream, dtype=np.int32, count=1)[0])
                 print(nread, nrec, len(outs))
@@ -59,7 +59,35 @@ def read_record(stream, tgt_size: int, dtype, debug=False, args=None):
 
 
 def skip_record(
-    stream, tgt_size, dtype
+    stream, nb_recs, debug=False
+):  # sometimes we want to go past next record using seek(,1)
+    # faster than reading and discarding
+    """
+    stream should be a file object
+    nb_recs is the number of dtype formated elements expected in the record
+    dtype can be a list of types if one record contains several values
+    e.g. when ramses writes lines consisting of several values in a loop
+    dtype should be interpretable by numpy.dtype
+    """
+
+    nread = 0
+
+    while nread < nb_recs:
+
+        nrec = abs(np.fromfile(stream, dtype=np.int32, count=1)[0])
+        if debug:
+            print(nrec)
+            stream.seek(nrec, 1)
+            nrec = abs(np.fromfile(stream, dtype=np.int32, count=1)[0])
+            print(nrec)
+        else:
+            stream.seek(nrec + 4, 1)
+        # nread += nrec
+        nread += 1
+
+
+def read_records(
+    stream, n_records, dtype, debug=False
 ):  # sometimes we want to go past next record using seek(,1)
     # faster than reading and discarding
     """
@@ -70,13 +98,21 @@ def skip_record(
     dtype should be interpretable by numpy.dtype
     """
 
-    nread = 0
+    cur_rec = 0
 
-    while nread < tgt_size:
+    read = []
+
+    while cur_rec < n_records:
         nrec = abs(np.fromfile(stream, dtype=np.int32, count=1)[0])
-        stream.seek(nrec, 1)
-        nread += nrec
+        # stream.seek(nrec, 1)
+        read.append(np.frombuffer(stream.read(nrec), dtype=dtype))
+        # print(nrec)
+        if debug:
+            print(nrec)
+        cur_rec += 1
         nrec = abs(np.fromfile(stream, dtype=np.int32, count=1)[0])
+
+    return read
 
 
 def read_tgt_fields(
@@ -150,12 +186,21 @@ def read_tgt_fields(
                         src, nrecord, field_types_read[idx], args=args, debug=debug
                     )
 
+            if debug:
+                if type(args) != slice:
+                    print(
+                        f"requested size is {len(args)}, returned size is {read_dat.shape}"
+                    )
+                print(read_dat[:].min(), read_dat[:].max())
+
             data[field_names[idx]] = read_dat[:]
 
         else:
+            if debug:
+                print("skip")
             for idim in range(cur_dim):
                 # read_record(src, nrecord, field_types_read[idx])
-                skip_record(src, nrecord, field_types_read[idx])
+                skip_record(src, 1, debug=debug)
 
 
 def write_record(stream, elements, dtypes=None):
@@ -178,3 +223,29 @@ def write_record(stream, elements, dtypes=None):
         for element, dtype in zip(elements, dtypes):
             stream.write(element.astype(dtype).tobytes(order="F"))
     stream.write(int(4 * size).to_bytes(4, byte_order))
+
+
+def read_all_record_sizes(
+    stream,
+):  # sometimes we want to go past next record using seek(,1)
+    # faster than reading and discarding
+    """
+    stream should be a file object
+    """
+
+    read = []
+
+    while True:
+
+        try:
+            nrec = abs(np.fromfile(stream, dtype=np.int32, count=1)[0])
+            stream.seek(nrec, 1)
+
+            # print(nrec)
+            read.append(nrec)
+
+            nrec = abs(np.fromfile(stream, dtype=np.int32, count=1)[0])
+        except IndexError:
+            break
+
+    return read

@@ -235,7 +235,7 @@ def get_files(sim: ramses_sim, snap, mins, maxs, debug=False):
             if not j in cpus_to_read:
                 cpus_to_read.append(j)
 
-    if debug:
-        print(f"{len(cpus_to_read):d} cpus to read")
+        if debug:
+            print(f"{len(cpus_to_read):d} cpus to read:", cpus_to_read)
 
     return cpus_to_read
